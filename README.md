@@ -1,9 +1,8 @@
 # goutil
 
 
-### db
-> mysql
-
+## db
+####mysql
     初始化
     增删改查 支持 query+stmt两种方式
     事物
