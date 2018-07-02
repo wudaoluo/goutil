@@ -1,0 +1,37 @@
+###简版的viper  github.com/spf13/viper
+
+仅支持 yml,json (ini后期考虑)
+
+
+
+### 要实现的功能
+1.
+2. 设置默认值
+3. 可以远程watch
+4. 获取值
+
+
+### 设置默认值
+
+viper.SetDefault("ContentDir", "content")
+viper.SetDefault("LayoutDir", "layouts")
+viper.SetDefault("Taxonomies", map[string]string{"tag": "tags", "category": "categories"})
+
+
+### 读取配置文件
+viper.SetConfigName("config") // name of config file (without extension)
+viper.AddConfigPath("/etc/appname/")   // path to look for the config file in
+viper.AddConfigPath("$HOME/.appname")  // call multiple times to add many search paths
+viper.AddConfigPath(".")               // optionally look for config in the working directory
+err := viper.ReadInConfig() // Find and read the config file
+if err != nil { // Handle errors reading the config file
+	panic(fmt.Errorf("Fatal error config file: %s \n", err))
+}
+
+
+###读取远程配置文件
+viper.AddRemoteProvider("etcd", "http://127.0.0.1:4001","/config/hugo.json")
+viper.SetConfigType("json") // because there is no file extension in a stream of bytes, supported extensions are "json", "toml", "yaml", "yml", "properties", "props", "prop"
+err := viper.ReadRemoteConfig()
+
+

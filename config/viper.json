@@ -1,0 +1,9 @@
+{
+  "port":7771,
+  "debug":true,
+  "a" : {
+    "test":"asasa",
+    "ab":"asasas",
+    "c" :{"as":"sdsdsdsd","cb":{"ca":"csdsds"}}
+  }
+}
