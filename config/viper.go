@@ -7,6 +7,8 @@ import (
 	"os"
 	"goutil/files"
 	"bytes"
+	"goutil/config/backends"
+	"github.com/fsnotify/fsnotify"
 )
 
 //接口添加able 组合 viperable
@@ -18,8 +20,8 @@ type viperable interface {
 	ReadConfig() error
 	WriteConfig() error
 	WatchConfig() error
-	Getdefault() map[string]interface{}
-	Getconfig() map[string]interface{}
+	//Getdefault() map[string]interface{}
+	//Getconfig() map[string]interface{}
 
 	//Get方法
 	Getvalue
@@ -28,6 +30,9 @@ type viperable interface {
 	//对配置文件的操作
 	//ReadInConfig() error
 	//WriteInConfig() error
+
+	//远程配置
+	AddRemoteProvider(provider, endpoint, path string) error
 
 }
 
@@ -42,7 +47,7 @@ type viper struct {
 	configFile string
 	configType string
 
-	remoteProviders []*defaultRemoteProvider
+	remoteProviders []*backends.ProviderConfig
 	operating Operater
 
 
@@ -128,6 +133,8 @@ func (v *viper) SetDefault(key string,value interface{}) {
 }
 
 
+//
+
 //TODO 这里读取配置文件失败难道不应该 panic吗
 func (v *viper) ReadConfig() error {
 	file, err :=files.ReadFile(v.configFile)
@@ -149,7 +156,38 @@ func (v *viper) WriteConfig() error {
 }
 
 func (v *viper) WatchConfig() error {
-	return v.operating.WatchConfig()
+	fn := func() {
+		watcher, err := fsnotify.NewWatcher()
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer watcher.Close()
+
+		watcher.Add(v.configFile)
+
+		for {
+			select {
+			case event := <-watcher.Events:
+				// we only care about the config file
+				if event.Op&fsnotify.Write == fsnotify.Write || event.Op&fsnotify.Create == fsnotify.Create {
+					fmt.Println("event:", event)
+					err := v.ReadConfig()
+					if err != nil {
+						log.Println("error:", err)
+					}
+					//v.onConfigChange(event)
+				}
+
+			case err := <-watcher.Errors:
+				log.Println("error:", err)
+			}
+		}
+
+	}
+
+	go fn()
+
+	return nil
 }
 
 func (v *viper) Getdefault() map[string]interface{} {
@@ -159,3 +197,4 @@ func (v *viper) Getdefault() map[string]interface{} {
 func (v *viper) Getconfig() map[string]interface{} {
 	return v.config
 }
+

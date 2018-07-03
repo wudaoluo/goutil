@@ -33,5 +33,15 @@ type configParseError struct {
 
 // Error returns the formatted configuration error.
 func (pe configParseError) Error() string {
-	return fmt.Sprintf("While parsing config: %s", pe.err.Error())
+	return fmt.Sprintf("配置文件解析失败: %s", pe.err.Error())
+}
+
+
+// UnsupportedRemoteProviderError denotes encountering an unsupported remote
+// provider. Currently only etcd and Consul are supported.
+type unsupportedRemoteProviderError string
+
+// Error returns the formatted remote provider error.
+func (e unsupportedRemoteProviderError) Error() string {
+	return fmt.Sprintf("不支持的远程配置类型 %q", string(e))
 }

@@ -68,8 +68,7 @@ func (e *es) Init() error {
 func (e *es) Put(area string,message []byte) error {
 	_, err := e.client.Index().
 		Index(area).
-		Type("doc").
-		BodyJson(string(message)).
+		Type("employee").BodyJson(string(message)).
 		Do(e.ctx)
 
 	return err

@@ -3,6 +3,7 @@ package config
 import (
 	"testing"
 	"fmt"
+	"time"
 )
 
 /*
@@ -23,17 +24,24 @@ func Test_JsonConf(t *testing.T) {
 	t.Log(a.Cfg)
 }
 
-
 */
-func Test_viper(t *testing.T) {
 
+func Test_viper(t *testing.T) {
+	var err error
 	v := New()
 	v.SetConfig("viper.json","json","/etc")
 	v.SetDefault("debug",false)
 	v.SetDefault("port1",7777)
 
-	err := v.ReadConfig()
+	//开启动态配置文件
+	err = v.WatchConfig()
+	//err = v.AddRemoteProvider("etcd", "http://127.0.0.1:4001","/config/hugo.json")
+	if err != nil {
+		panic(err)
+	}
+	err = v.ReadConfig()
 	//err := v.ReadInConfig()
+
 	if err != nil {
 		panic(fmt.Errorf("Fatal error config file: %s \n", err))
 	}
@@ -47,9 +55,16 @@ func Test_viper(t *testing.T) {
 	fmt.Println(v.GetString("a.c.as"))
 	fmt.Println(v.GetString("a.c.cb.ca"))
 	fmt.Println(v.GetStringMap("a.c.cb")["ca"])
-	fmt.Println(v.Getconfig())
+
+	for {
+		time.Sleep(1*time.Second)
+		fmt.Println(v.GetBool("debug"))
+	}
+	//fmt.Println(v.Getconfig())
 
 
-	fmt.Println(v.Getdefault())
+	//fmt.Println(v.Getdefault())
+
+
 
 }

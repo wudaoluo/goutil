@@ -24,7 +24,3 @@ func (cfg *conf) ReadConfig(in io.Reader, c map[string]interface{}) error {
 func (cfg *conf) WriteConfig() error {
 	return nil
 }
-
-func (cfg *conf) WatchConfig() error {
-	return nil
-}
