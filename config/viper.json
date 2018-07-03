@@ -1,6 +1,6 @@
 {
   "port":7771,
-  "debug":true,
+  "debug":false,
   "a" : {
     "test":"asasa",
     "ab":"asasas",

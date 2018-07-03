@@ -168,14 +168,18 @@ func (v *viper) WatchConfig() error {
 		for {
 			select {
 			case event := <-watcher.Events:
-				// we only care about the config file
-				if event.Op&fsnotify.Write == fsnotify.Write || event.Op&fsnotify.Create == fsnotify.Create {
-					fmt.Println("event:", event)
+				fmt.Println("event:", event)
+
+				if event.Op&fsnotify.Remove == fsnotify.Remove ||
+					event.Op&fsnotify.Rename == fsnotify.Rename ||
+					event.Op&fsnotify.Write == fsnotify.Write ||
+					event.Op&fsnotify.Create == fsnotify.Create {
+					watcher.Remove(v.configFile)
+					watcher.Add(v.configFile)
 					err := v.ReadConfig()
 					if err != nil {
 						log.Println("error:", err)
 					}
-					//v.onConfigChange(event)
 				}
 
 			case err := <-watcher.Errors:
