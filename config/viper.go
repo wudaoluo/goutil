@@ -8,7 +8,11 @@ import (
 	"goutil/files"
 	"bytes"
 	"goutil/config/backends"
-	"github.com/fsnotify/fsnotify"
+	"github.com/coreos/etcd/client"
+	"time"
+	"context"
+	"strings"
+	"encoding/json"
 )
 
 //接口添加able 组合 viperable
@@ -19,7 +23,7 @@ type viperable interface {
 	SetKeyDelim(delim string)
 	ReadConfig() error
 	WriteConfig() error
-	WatchConfig() error
+	WatchConfig(remoteCfg *backends.ProviderConfig) error
 	//Getdefault() map[string]interface{}
 	//Getconfig() map[string]interface{}
 
@@ -32,7 +36,7 @@ type viperable interface {
 	//WriteInConfig() error
 
 	//远程配置
-	AddRemoteProvider(provider, endpoint, path string) error
+	//AddRemoteProvider(provider, endpoint, path string) error
 
 }
 
@@ -151,48 +155,159 @@ func (v *viper) ReadConfig() error {
 }
 
 
+
 func (v *viper) WriteConfig() error {
 	return v.operating.WriteConfig()
 }
 
-func (v *viper) WatchConfig() error {
-	fn := func() {
-		watcher, err := fsnotify.NewWatcher()
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer watcher.Close()
 
-		watcher.Add(v.configFile)
+//func (v *viper) WatchConfig(remoteCfg *backends.ProviderConfig) error {
+//	remoteCfg.ConfigFiles = v.configFile
+//	r,err := backends.New(remoteCfg)
+//	if err != nil {
+//		return err
+//	}
+//
+//
+//	r.WatchConfig(v)
+//
+//	return nil
+//}
+
+func (v *viper) WatchConfig(remoteCfg *backends.ProviderConfig) error {
+	c ,_:=NewClient(remoteCfg.Endpoint,remoteCfg.Prefix)
+	watcher := c.client.Watcher(c.prefix, &client.WatcherOptions{
+		Recursive: true,
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	//确保整个for完全退出后在 退出这个函数，说白了就是善后工作
+	cancelRoutine := make(chan bool)
+	defer close(cancelRoutine)
+
+	go func() {
+		select {
+		case <-c.stopChan:
+			cancel()
+		case <-cancelRoutine:
+			return
+		}
+	}()
+
+	go func() {
 
 		for {
-			select {
-			case event := <-watcher.Events:
-				fmt.Println("event:", event)
+			res, err := watcher.Next(ctx)
+			if err != nil {
+				//logger.Error("etcd watch 错误",err)
+				fmt.Println(err)
+				time.Sleep(time.Second * 1)
+				continue
+			}
 
-				if event.Op&fsnotify.Remove == fsnotify.Remove ||
-					event.Op&fsnotify.Rename == fsnotify.Rename ||
-					event.Op&fsnotify.Write == fsnotify.Write ||
-					event.Op&fsnotify.Create == fsnotify.Create {
-					watcher.Remove(v.configFile)
-					watcher.Add(v.configFile)
-					err := v.ReadConfig()
-					if err != nil {
-						log.Println("error:", err)
-					}
+			if res.Action == "set" || res.Action == "update" || res.Action == "delete" {
+				//ress := res
+
+				//aa := []string{}
+				//jsonStringToObject(res.Node.Value,&aa)
+				if strings.HasPrefix(res.Node.Value,"[") &&
+					strings.HasSuffix(res.Node.Value,"]") {
+					a := []string{}
+					data := []byte(res.Node.Value)
+					json.Unmarshal(data, a)
+					v.config["key3"] = a
+					return
 				}
 
-			case err := <-watcher.Errors:
-				log.Println("error:", err)
+
+				v.config["key3"] = res.Node.Value
+				return
+				//v.config["key4"] = strings.Split(res.Node.Value,",")
+				fmt.Println(res.Action, res.Node.Key, res.Node.Value)
+				//go func() {
+				//logger.Info("更新",res.Node.Key,res.Node.Value)
+
+				//_dir,_key,err := getkey(ress.Node.Key)
+				//if err != nil {
+				//logger.Error(err)
+				//}
+				//更新值 ，保存到配置文件中
+
+				//cfgfile.save()
+				//}()
 			}
+
 		}
-
-	}
-
-	go fn()
-
+	}()
 	return nil
 }
+
+
+type Client struct {
+	client client.KeysAPI
+	prefix string
+	stopChan   chan struct{}
+	close      bool
+}
+
+// NewEtcdClient returns an *etcd.Client with a connection to named machines.
+func NewClient(endpoint []string,Prefix string) (*Client, error) {
+	cfg := client.Config{
+		Endpoints:   endpoint,
+		Transport:  client.DefaultTransport,
+		HeaderTimeoutPerRequest: time.Second * 1,
+	}
+
+
+	var kapi client.KeysAPI
+
+	c, err := client.New(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	kapi = client.NewKeysAPI(c)
+	return &Client{client:kapi,prefix:Prefix}, nil
+}
+
+//func (v *viper) WatchConfig() error {
+//	fn := func() {
+//		watcher, err := fsnotify.NewWatcher()
+//		if err != nil {
+//			log.Fatal(err)
+//		}
+//		defer watcher.Close()
+//
+//		watcher.Add(v.configFile)
+//
+//		for {
+//			select {
+//			case event := <-watcher.Events:
+//				fmt.Println("event:", event)
+//
+//				if event.Op&fsnotify.Remove == fsnotify.Remove ||
+//					event.Op&fsnotify.Rename == fsnotify.Rename ||
+//					event.Op&fsnotify.Write == fsnotify.Write ||
+//					event.Op&fsnotify.Create == fsnotify.Create {
+//					watcher.Remove(v.configFile)
+//					watcher.Add(v.configFile)
+//					err := v.ReadConfig()
+//					if err != nil {
+//						log.Println("error:", err)
+//					}
+//				}
+//
+//			case err := <-watcher.Errors:
+//				log.Println("error:", err)
+//			}
+//		}
+//
+//	}
+//
+//	go fn()
+//
+//	return nil
+//}
 
 func (v *viper) Getdefault() map[string]interface{} {
 	return v.defaults

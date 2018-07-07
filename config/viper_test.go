@@ -4,6 +4,8 @@ import (
 	"testing"
 	"fmt"
 	"time"
+	"goutil/config/backends"
+	"reflect"
 )
 
 /*
@@ -34,7 +36,13 @@ func Test_viper(t *testing.T) {
 	v.SetDefault("port1",7777)
 
 	//开启动态配置文件
-	err = v.WatchConfig()
+	remoteCfg := &backends.ProviderConfig{
+		Provider:"etcd",
+		Endpoint:[]string{"http://10.211.55.4:2378"},
+		Prefix:"/test/aaa",
+	}
+	//remoteCfg := &backends.ProviderConfig{Provider:"file"}
+	err = v.WatchConfig(remoteCfg)
 	//err = v.AddRemoteProvider("etcd", "http://127.0.0.1:4001","/config/hugo.json")
 	if err != nil {
 		panic(err)
@@ -58,10 +66,13 @@ func Test_viper(t *testing.T) {
 
 	for {
 		time.Sleep(1*time.Second)
-		fmt.Println(v.GetBool("debug"))
+		fmt.Println(v.GetStringSlice("key3"))
+		a := v.GetStringSlice("key3")
+		fmt.Println(reflect.TypeOf(a))
+		fmt.Println(len(a))
 	}
 	//fmt.Println(v.Getconfig())
-
+	time.Sleep(1*time.Hour)
 
 	//fmt.Println(v.Getdefault())
 

@@ -8,7 +8,7 @@ import (
 
 type Eser interface {
 	Init() error
-	Put(area string,message []byte) error
+	Put(area string,message interface{}) error
 	Index() error
 }
 
@@ -65,10 +65,10 @@ func (e *es) Init() error {
 */
 
 
-func (e *es) Put(area string,message []byte) error {
+func (e *es) Put(area string,message interface{}) error {
 	_, err := e.client.Index().
 		Index(area).
-		Type("employee").BodyJson(string(message)).
+		Type("employee").BodyJson(message).
 		Do(e.ctx)
 
 	return err

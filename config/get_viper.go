@@ -17,10 +17,13 @@ type Getvalue interface {
 	GetTime(key string) time.Time
 	GetDuration(key string) time.Duration
 	GetStringSlice(key string) []string
+	GetIntSlice(key string) []int
 	GetStringMap(key string) map[string]interface{}
 	GetStringMapString(key string) map[string]string
 	GetStringMapStringSlice(key string) map[string][]string
 }
+
+
 
 
 func (v *viper) GetString(key string) string {
@@ -66,6 +69,9 @@ func (v *viper) GetStringSlice(key string) []string {
 	return cast.ToStringSlice(v.get(key))
 }
 
+func (v *viper) GetIntSlice(key string) []int {
+	return cast.ToIntSlice(v.get(key))
+}
 
 func (v *viper) GetStringMap(key string) map[string]interface{} {
 	return cast.ToStringMap(v.get(key))
