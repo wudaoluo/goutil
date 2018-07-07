@@ -10,9 +10,10 @@ import (
 	"goutil/config/backends"
 	"github.com/coreos/etcd/client"
 	"time"
-	"context"
+	"goutil/config/backend"
 	"strings"
 	"encoding/json"
+	"github.com/spf13/cast"
 )
 
 //接口添加able 组合 viperable
@@ -21,19 +22,22 @@ type viperable interface {
 	SetDefault(key string, value interface{})
 	SetConfig(cfgfile,cfgtype string,cfgpath ...string)
 	SetKeyDelim(delim string)
-	ReadConfig() error
-	WriteConfig() error
-	WatchConfig(remoteCfg *backends.ProviderConfig) error
+
+	WatchConfig(remoteCfg *backend.Config) error
+	Stop()
 	//Getdefault() map[string]interface{}
 	//Getconfig() map[string]interface{}
 
+
 	//Get方法
 	Getvalue
+
 	//AddConfigPath(cfgpath string)
 	//Operater
+
 	//对配置文件的操作
-	//ReadInConfig() error
-	//WriteInConfig() error
+	ReadConfig() error
+	WriteConfig() error
 
 	//远程配置
 	//AddRemoteProvider(provider, endpoint, path string) error
@@ -61,6 +65,7 @@ type viper struct {
 	defaults       map[string]interface{}
 	//kvstore        map[string]interface{}
 	//pflags         map[string]FlagValue
+	stop       chan struct{}
 }
 
 
@@ -71,10 +76,15 @@ func New() viperable {
 	v.keyDelim = "."
 	v.config = make(map[string]interface{})
 	v.defaults = make(map[string]interface{})
+	v.stop = make(chan struct{},0)
 
 	return v
 }
 
+
+func (v *viper) Stop() {
+	v.stop <- struct{}{}
+}
 
 // SetConfigName 设置配置文件的名称
 func (v *viper) SetConfig(cfgfile ,cfgtype string, cfgpath ...string) {
@@ -157,90 +167,87 @@ func (v *viper) ReadConfig() error {
 
 
 func (v *viper) WriteConfig() error {
-	return v.operating.WriteConfig()
+	return v.operating.WriteConfig(v.config)
 }
 
+//这里的stop 以后可以换成context,,  string, map，[]string  []int 都能自动转换,其他类型需要自定义fn函数
+func (v *viper) WatchConfig(remoteCfg *backend.Config) error {
+	remoteCfg.ConfigFiles = v.configFile
+	r,err := backend.New(remoteCfg)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
 
-//func (v *viper) WatchConfig(remoteCfg *backends.ProviderConfig) error {
-//	remoteCfg.ConfigFiles = v.configFile
-//	r,err := backends.New(remoteCfg)
-//	if err != nil {
-//		return err
-//	}
-//
-//
-//	r.WatchConfig(v)
-//
-//	return nil
-//}
 
-func (v *viper) WatchConfig(remoteCfg *backends.ProviderConfig) error {
-	c ,_:=NewClient(remoteCfg.Endpoint,remoteCfg.Prefix)
-	watcher := c.client.Watcher(c.prefix, &client.WatcherOptions{
-		Recursive: true,
-	})
-
-	ctx, cancel := context.WithCancel(context.Background())
-	//确保整个for完全退出后在 退出这个函数，说白了就是善后工作
-	cancelRoutine := make(chan bool)
-	defer close(cancelRoutine)
-
+	remotechan := r.Watch(v.stop)
+	//var a backends.Response
 	go func() {
-		select {
-		case <-c.stopChan:
-			cancel()
-		case <-cancelRoutine:
-			return
-		}
-	}()
-
-	go func() {
-
 		for {
-			res, err := watcher.Next(ctx)
-			if err != nil {
-				//logger.Error("etcd watch 错误",err)
-				fmt.Println(err)
-				time.Sleep(time.Second * 1)
-				continue
-			}
+			select {
+			case a := <- remotechan:
+				if a.Error != nil {
+					fmt.Println("err1",err)
+					continue
+				}
 
-			if res.Action == "set" || res.Action == "update" || res.Action == "delete" {
-				//ress := res
-
-				//aa := []string{}
-				//jsonStringToObject(res.Node.Value,&aa)
-				if strings.HasPrefix(res.Node.Value,"[") &&
-					strings.HasSuffix(res.Node.Value,"]") {
-					a := []string{}
-					data := []byte(res.Node.Value)
-					json.Unmarshal(data, a)
-					v.config["key3"] = a
-					return
+				if remoteCfg.Backend == "file" {
+					v.ReadConfig()
+					continue
 				}
 
 
-				v.config["key3"] = res.Node.Value
+				//这里是其他的backend
+				fmt.Println(a.Key,string(a.Value.(string)))
+
+
+				switch  {
+				case strings.HasPrefix(a.Value.(string),"[") && strings.HasSuffix(a.Value.(string),"]"):
+					var a1  = make([]interface{},0)
+					data := []byte(a.Value.(string))
+					err:=json.Unmarshal(data, &a1)
+					fmt.Println("jsonerr",err)
+					fmt.Println("a1",len(a1))
+					//v.config[a.Key] =a1
+					//var v1 = make([]interface{},0)
+					//jsonStringToObject(a.Value,&v1)
+
+					//fmt.Println("len",len(v1))
+					v.SetSplit(a.Key,a1)
+				case strings.HasPrefix(a.Value.(string),"{") && strings.HasSuffix(a.Value.(string),"}"):
+					b:=cast.ToStringMap(a.Value)
+
+					v.Set(a.Key,b)
+				default:
+
+					err = remoteCfg.Fn(a)
+					if err != nil {
+						fmt.Println(err)
+					}
+					//key value 都是字符串
+					v.Set(a.Key,a.Value)
+				}
+
+
+				//保存到本地
+				err = v.WriteConfig()
+				if err != nil {
+					fmt.Println(err)
+				}
+
+
+			case <- v.stop:
 				return
-				//v.config["key4"] = strings.Split(res.Node.Value,",")
-				fmt.Println(res.Action, res.Node.Key, res.Node.Value)
-				//go func() {
-				//logger.Info("更新",res.Node.Key,res.Node.Value)
-
-				//_dir,_key,err := getkey(ress.Node.Key)
-				//if err != nil {
-				//logger.Error(err)
-				//}
-				//更新值 ，保存到配置文件中
-
-				//cfgfile.save()
-				//}()
 			}
-
 		}
 	}()
+	//r.WatchConfig(v)
+
 	return nil
 }
+
+
+
 
 
 type Client struct {
@@ -270,44 +277,7 @@ func NewClient(endpoint []string,Prefix string) (*Client, error) {
 	return &Client{client:kapi,prefix:Prefix}, nil
 }
 
-//func (v *viper) WatchConfig() error {
-//	fn := func() {
-//		watcher, err := fsnotify.NewWatcher()
-//		if err != nil {
-//			log.Fatal(err)
-//		}
-//		defer watcher.Close()
-//
-//		watcher.Add(v.configFile)
-//
-//		for {
-//			select {
-//			case event := <-watcher.Events:
-//				fmt.Println("event:", event)
-//
-//				if event.Op&fsnotify.Remove == fsnotify.Remove ||
-//					event.Op&fsnotify.Rename == fsnotify.Rename ||
-//					event.Op&fsnotify.Write == fsnotify.Write ||
-//					event.Op&fsnotify.Create == fsnotify.Create {
-//					watcher.Remove(v.configFile)
-//					watcher.Add(v.configFile)
-//					err := v.ReadConfig()
-//					if err != nil {
-//						log.Println("error:", err)
-//					}
-//				}
-//
-//			case err := <-watcher.Errors:
-//				log.Println("error:", err)
-//			}
-//		}
-//
-//	}
-//
-//	go fn()
-//
-//	return nil
-//}
+
 
 func (v *viper) Getdefault() map[string]interface{} {
 	return v.defaults

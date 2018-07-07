@@ -4,6 +4,8 @@ import (
 	"github.com/json-iterator/go"
 	"io"
 	"bytes"
+	"io/ioutil"
+	"os"
 )
 
 type conf struct {
@@ -29,6 +31,33 @@ func (cfg *conf) ReadConfig(in io.Reader, c map[string]interface{}) error {
 }
 
 
-func (cfg *conf) WriteConfig() error {
+func (cfg *conf) WriteConfig(v interface{}) error {
+	var err error
+
+	saveData,err := jsoniter.MarshalIndent(v,"","    ")
+	if err != nil {
+		return err
+	}
+
+	temp, err := ioutil.TempFile(".", ".tmp")
+	if err != nil {
+		return err
+	}
+	defer temp.Close()
+
+	_, err = temp.Write(saveData)
+	if err != nil {
+		return err
+	}
+
+	defer os.Remove(temp.Name())
+
+
+	err = os.Rename(temp.Name(),cfg.configfile)
+
+	if err != nil {
+		return err
+	}
+
 	return nil
 }

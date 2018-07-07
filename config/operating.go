@@ -11,7 +11,7 @@ import (
 type Operater interface {
 	SetConfigFile(cnofigfile string)  //设置配置文件
 	ReadConfig(in io.Reader, c map[string]interface{}) error   //读取配置文件
-	WriteConfig() error  //写入配置文件
+	WriteConfig(v interface{}) error  //写入配置文件
 	//WatchConfig() error
 	//WatchRemoteConfig()
 }

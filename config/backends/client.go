@@ -15,6 +15,17 @@ import (
 //	Path() string
 //}
 
+
+
+type Response struct {
+	Action string
+	Key   string
+	Value interface{}
+	Error error
+}
+
+
+
 type StoreClient interface {
 	WatchConfig(func() error)
 	StopWatch()

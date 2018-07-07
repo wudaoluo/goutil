@@ -1,9 +1,18 @@
 {
-  "port":7771,
-  "debug":false,
-  "a" : {
-    "test":"asasa",
-    "ab":"asasas",
-    "c" :{"as":"sdsdsdsd","cb":{"ca":"csdsds"}}
-  }
+    "debug": true,
+    "asaas": "sdsddssd",
+    "key4": {
+        "a": "b"
+    },
+    "port": 1111,
+    "key3": [
+        155,
+        2,
+        3,
+        4,
+        5,
+        6,
+        8,
+        9
+    ]
 }

@@ -4,8 +4,10 @@ import (
 	"testing"
 	"fmt"
 	"time"
-	"goutil/config/backends"
+	"goutil/config/backend"
 	"reflect"
+	"goutil/config/backends"
+	"github.com/spf13/cast"
 )
 
 /*
@@ -36,12 +38,26 @@ func Test_viper(t *testing.T) {
 	v.SetDefault("port1",7777)
 
 	//开启动态配置文件
-	remoteCfg := &backends.ProviderConfig{
-		Provider:"etcd",
-		Endpoint:[]string{"http://10.211.55.4:2378"},
+	remoteCfg := &backend.Config{
+		Backend:"etcd",
+		Endpoint:[]string{"http://192.168.1.105:2378"},
 		Prefix:"/test/aaa",
 	}
-	//remoteCfg := &backends.ProviderConfig{Provider:"file"}
+
+	remoteCfg.Fn = func(a *backends.Response) error {
+
+
+		switch a.Key {
+		case "debug":
+			a.Value,err = cast.ToBoolE(a.Value)
+			return err
+		case "port":
+			a.Value,err = cast.ToIntE(a.Value)
+			return err
+		}
+		return nil
+	}
+	//remoteCfg := &backend.Config{Backend:"file"}
 	err = v.WatchConfig(remoteCfg)
 	//err = v.AddRemoteProvider("etcd", "http://127.0.0.1:4001","/config/hugo.json")
 	if err != nil {
@@ -65,14 +81,20 @@ func Test_viper(t *testing.T) {
 	fmt.Println(v.GetStringMap("a.c.cb")["ca"])
 
 	for {
-		time.Sleep(1*time.Second)
-		fmt.Println(v.GetStringSlice("key3"))
-		a := v.GetStringSlice("key3")
+		time.Sleep(3*time.Second)
+		fmt.Println(v.GetInt("asasa"))
+		fmt.Println(v.GetBool("debug"))
+		fmt.Println(v.GetStringMap("key4")["a"])
+		fmt.Println(v.GetIntSlice("key3"))
+		a := v.GetIntSlice("key3")
 		fmt.Println(reflect.TypeOf(a))
 		fmt.Println(len(a))
+
+
 	}
 	//fmt.Println(v.Getconfig())
 	time.Sleep(1*time.Hour)
+	v.Stop()
 
 	//fmt.Println(v.Getdefault())
 

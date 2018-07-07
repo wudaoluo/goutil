@@ -21,6 +21,6 @@ func (cfg *conf) ReadConfig(in io.Reader, c map[string]interface{}) error {
 }
 
 
-func (cfg *conf) WriteConfig() error {
+func (cfg *conf) WriteConfig(v interface{}) error {
 	return nil
 }
