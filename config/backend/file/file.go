@@ -27,6 +27,11 @@ func NewClient(configFile string) (*client,error) {
 }
 
 
+func (c *client) List(respChan chan *backends.Response) error {
+	return nil
+}
+
+
 func (c *client) Watch(stop chan struct{}) <-chan *backends.Response {
 	respChan := make(chan *backends.Response, 10)  //加个缓冲区
 
@@ -75,6 +80,8 @@ func (c *client) Watch(stop chan struct{}) <-chan *backends.Response {
 
 	return respChan
 }
+
+
 
 
 

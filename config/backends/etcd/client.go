@@ -92,7 +92,6 @@ func (c *Client) watch(fn func() error) {
 	}()
 
 	for {
-		fmt.Println("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 		res, err := watcher.Next(ctx)
 		if err != nil {
 			//logger.Error("etcd watch 错误",err)

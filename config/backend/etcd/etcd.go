@@ -61,9 +61,44 @@ func NewClient(endpoint []string,Prefix string) (*client,error) {
 //	return nil
 //}
 
-//func (c *client) List(key string) (backend.KVPairs, error) {
-//	return nil,nil
-//}
+
+
+// nodeWalk recursively descends nodes, updating vars.
+func (c *client)nodeWalk(node *goetcd.Node, respChan chan *backends.Response) error {
+	if node != nil {
+		key := convertKey(node.Key,c.prefix)
+		if !node.Dir {
+			fmt.Println(key)
+			respChan <- &backends.Response{Key:key,Value:node.Value}
+			//vars[key] = node.Value
+		} else {
+			for _, node := range node.Nodes {
+				c.nodeWalk(node, respChan)
+			}
+		}
+	}
+	return nil
+}
+
+func (c *client) List(respChan chan *backends.Response) error {
+
+	resp, err := c.keysAPI.Get(context.Background(), c.prefix, &goetcd.GetOptions{
+		Recursive: true,
+		Sort:      true,
+		Quorum:    true,
+	})
+	if err != nil {
+		return  err
+	}
+	err = c.nodeWalk(resp.Node, respChan)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	close(respChan)
+	return nil
+}
 
 func (c *client) Watch(stop chan struct{}) <-chan *backends.Response {
 	respChan := make(chan *backends.Response, 10)  //加个缓冲区

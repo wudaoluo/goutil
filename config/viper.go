@@ -11,9 +11,7 @@ import (
 	"github.com/coreos/etcd/client"
 	"time"
 	"goutil/config/backend"
-	"strings"
-	"encoding/json"
-	"github.com/spf13/cast"
+	"sync"
 )
 
 //接口添加able 组合 viperable
@@ -39,6 +37,10 @@ type viperable interface {
 	ReadConfig() error
 	WriteConfig() error
 
+	ReadRemoteConfig() error
+
+	SetFunc(fn func(key string, value interface{}) error)
+
 	//远程配置
 	//AddRemoteProvider(provider, endpoint, path string) error
 
@@ -57,7 +59,7 @@ type viper struct {
 
 	remoteProviders []*backends.ProviderConfig
 	operating Operater
-
+	backend    backend.StoreClient
 
 	// 配置值相关的
 	config         map[string]interface{}
@@ -66,6 +68,10 @@ type viper struct {
 	//kvstore        map[string]interface{}
 	//pflags         map[string]FlagValue
 	stop       chan struct{}
+	//TODO改怎么解释这个函数的作用大呢
+	fn      		func(key string, value interface{}) error
+
+	mu       sync.RWMutex
 }
 
 
@@ -81,6 +87,10 @@ func New() viperable {
 	return v
 }
 
+
+func (v *viper) SetFunc(fn func(key string, value interface{}) error) {
+	v.fn = fn
+}
 
 func (v *viper) Stop() {
 	v.stop <- struct{}{}
@@ -161,9 +171,57 @@ func (v *viper) ReadConfig() error {
 		return configParseError{err}
 	}
 
+	for {
+		v.Set("debug",false)
+	}
+
+
 	return nil
 }
 
+
+
+func (v *viper) ReadRemoteConfig() error {
+	//读取远程配置
+	var err error
+	respChan := make(chan *backends.Response, 10)  //添加缓存 让etcd尽快处理完
+
+	go func() {
+		for {
+			select {
+			case a,ok := <- respChan:
+				if !ok {
+					//读取完成关闭通道，写入配置文件到本地
+					err = v.WriteConfig()
+					if err != nil {
+						fmt.Println(err,"关闭通道")
+					}
+					return
+				}
+				err = v.Set(a.Key,a.Value)
+				//if err != nil {
+				//	fmt.Println(err)
+				//}
+				//
+				//fmt.Println(v.config)
+
+			}
+
+		}
+	}()
+
+	err = v.backend.List(respChan)
+	if err != nil {
+
+		fmt.Println(err)
+		return err
+	}
+
+
+	return nil
+	//写入到本地
+	//return v.WriteConfig()
+}
 
 
 func (v *viper) WriteConfig() error {
@@ -173,19 +231,20 @@ func (v *viper) WriteConfig() error {
 //这里的stop 以后可以换成context,,  string, map，[]string  []int 都能自动转换,其他类型需要自定义fn函数
 func (v *viper) WatchConfig(remoteCfg *backend.Config) error {
 	remoteCfg.ConfigFiles = v.configFile
-	r,err := backend.New(remoteCfg)
+	var err error
+	v.backend,err = backend.New(remoteCfg)
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
 
 
-	remotechan := r.Watch(v.stop)
+	remotechan := v.backend.Watch(v.stop)
 	//var a backends.Response
 	go func() {
 		for {
 			select {
-			case a := <- remotechan:
+			case a := <- remotechan:  //TODO 还有DELETE类型没有判断
 				if a.Error != nil {
 					fmt.Println("err1",err)
 					continue
@@ -201,33 +260,7 @@ func (v *viper) WatchConfig(remoteCfg *backend.Config) error {
 				fmt.Println(a.Key,string(a.Value.(string)))
 
 
-				switch  {
-				case strings.HasPrefix(a.Value.(string),"[") && strings.HasSuffix(a.Value.(string),"]"):
-					var a1  = make([]interface{},0)
-					data := []byte(a.Value.(string))
-					err:=json.Unmarshal(data, &a1)
-					fmt.Println("jsonerr",err)
-					fmt.Println("a1",len(a1))
-					//v.config[a.Key] =a1
-					//var v1 = make([]interface{},0)
-					//jsonStringToObject(a.Value,&v1)
-
-					//fmt.Println("len",len(v1))
-					v.SetSplit(a.Key,a1)
-				case strings.HasPrefix(a.Value.(string),"{") && strings.HasSuffix(a.Value.(string),"}"):
-					b:=cast.ToStringMap(a.Value)
-
-					v.Set(a.Key,b)
-				default:
-
-					err = remoteCfg.Fn(a)
-					if err != nil {
-						fmt.Println(err)
-					}
-					//key value 都是字符串
-					v.Set(a.Key,a.Value)
-				}
-
+				v.Set(a.Key,a.Value)
 
 				//保存到本地
 				err = v.WriteConfig()

@@ -3,6 +3,8 @@ package config
 import (
 	"strings"
 	"fmt"
+	"encoding/json"
+	"github.com/spf13/cast"
 )
 
 func (v *viper) SetSplit(key string, value []interface{}) {
@@ -19,9 +21,79 @@ func (v *viper) SetSplit(key string, value []interface{}) {
 	deepestMap[lastKey] = value
 }
 
-func (v *viper) Set(key string, value interface{}) {
+
+func (v *viper) Set(key string, value interface{})  error {
+	
+	if _,ok := value.(string);ok {
+		if strings.HasPrefix(value.(string),"[") && strings.HasSuffix(value.(string),"]") {
+
+			var a1= make([]interface{}, 0)
+			data := []byte(value.(string))
+			err := json.Unmarshal(data, &a1)
+			fmt.Println("jsonerr", err)
+			fmt.Println("a1", len(a1))
+			//v.config[a.Key] =a1
+			//var v1 = make([]interface{},0)
+			//jsonStringToObject(a.Value,&v1)
+
+			//fmt.Println("len",len(v1))
+			v.set(key, a1)
+			return nil
+		} 
+		if strings.HasPrefix(value.(string),"{") && strings.HasSuffix(value.(string),"}") {
+			value=cast.ToStringMap(value)
+			v.set(key,value)
+			return nil
+		}
+	}
+
+	err := v.fn(key,value)
+
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	v.set(key,value)
+	return nil
+	//
+	//switch  {
+	//case strings.HasPrefix(value.(string),"[") && strings.HasSuffix(value.(string),"]"):
+	//	var a1  = make([]interface{},0)
+	//	data := []byte(value.(string))
+	//	err:=json.Unmarshal(data, &a1)
+	//	fmt.Println("jsonerr",err)
+	//	fmt.Println("a1",len(a1))
+	//	//v.config[a.Key] =a1
+	//	//var v1 = make([]interface{},0)
+	//	//jsonStringToObject(a.Value,&v1)
+	//
+	//	//fmt.Println("len",len(v1))
+	//	v.set(key,a1)
+	//case strings.HasPrefix(value.(string),"{") && strings.HasSuffix(value.(string),"}"):
+	//	value=cast.ToStringMap(value)
+	//
+	//	v.set(key,value)
+	//default:
+	//
+	//	err := v.fn(key,value)
+	//	//err = remoteCfg.Fn(a)
+	//	if err != nil {
+	//		fmt.Println(err)
+	//		return err
+	//	}
+	//	//key value 都是字符串
+	//	v.set(key,value)
+	//}
+	//return nil
+
+}
+
+func (v *viper) set(key string, value interface{}) {
 	// If alias passed in, then set the proper override
 	//value = toCaseInsensitiveValue(value)
+
+	v.mu.Lock()
+	defer v.mu.Unlock()
 
 	path := strings.Split(key, v.keyDelim)
 	lastKey := path[len(path)-1]

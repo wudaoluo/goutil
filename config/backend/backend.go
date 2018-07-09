@@ -26,7 +26,7 @@ type StoreClient interface {
 	//Get(key string) ([]byte, error)
 	//
 	//// List retrieves all keys and values under a provided key.
-	//List(key string) (KVPairs, error)
+	List(respChan chan *backends.Response) error
 	//
 	//// Set sets the provided key to value.
 	//Set(key string, value []byte) error

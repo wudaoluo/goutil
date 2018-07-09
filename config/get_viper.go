@@ -27,62 +27,88 @@ type Getvalue interface {
 
 
 func (v *viper) GetString(key string) string {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
 	return cast.ToString(v.get(key))
 }
 
 
 func (v *viper) GetBool(key string) bool {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
 	return cast.ToBool(v.get(key))
 }
 
 
 func (v *viper) GetInt(key string) int {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
 	return cast.ToInt(v.get(key))
 }
 
 
 func (v *viper) GetInt32(key string) int32 {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
 	return cast.ToInt32(v.get(key))
 }
 
 
 func (v *viper) GetInt64(key string) int64 {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
 	return cast.ToInt64(v.get(key))
 }
 
 
 func (v *viper) GetFloat64(key string) float64 {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
 	return cast.ToFloat64(v.get(key))
 }
 
 
 func (v *viper) GetTime(key string) time.Time {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
 	return cast.ToTime(v.get(key))
 }
 
 func (v *viper) GetDuration(key string) time.Duration {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
 	return cast.ToDuration(v.get(key))
 }
 
 
 func (v *viper) GetStringSlice(key string) []string {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
 	return cast.ToStringSlice(v.get(key))
 }
 
 func (v *viper) GetIntSlice(key string) []int {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
 	return cast.ToIntSlice(v.get(key))
 }
 
 func (v *viper) GetStringMap(key string) map[string]interface{} {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
 	return cast.ToStringMap(v.get(key))
 }
 
 
 func (v *viper) GetStringMapString(key string) map[string]string {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
 	return cast.ToStringMapString(v.get(key))
 }
 
 func (v *viper) GetStringMapStringSlice(key string) map[string][]string {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
 	return cast.ToStringMapStringSlice(v.get(key))
 }
 

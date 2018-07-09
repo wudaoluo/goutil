@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 	"goutil/config/backend"
-	"reflect"
-	"goutil/config/backends"
 	"github.com/spf13/cast"
 )
 
@@ -39,32 +37,35 @@ func Test_viper(t *testing.T) {
 
 	//开启动态配置文件
 	remoteCfg := &backend.Config{
-		Backend:"etcd",
-		Endpoint:[]string{"http://192.168.1.105:2378"},
+		Backend:"file",
+		Endpoint:[]string{"http://10.211.55.4:2378"},
 		Prefix:"/test/aaa",
 	}
 
-	remoteCfg.Fn = func(a *backends.Response) error {
+	fn := func(key string, value interface{}) error {
 
 
-		switch a.Key {
+		switch key {
 		case "debug":
-			a.Value,err = cast.ToBoolE(a.Value)
+			value,err = cast.ToBoolE(value)
 			return err
 		case "port":
-			a.Value,err = cast.ToIntE(a.Value)
+			value,err = cast.ToIntE(value)
 			return err
 		}
 		return nil
 	}
+
+	v.SetFunc(fn)
 	//remoteCfg := &backend.Config{Backend:"file"}
 	err = v.WatchConfig(remoteCfg)
 	//err = v.AddRemoteProvider("etcd", "http://127.0.0.1:4001","/config/hugo.json")
 	if err != nil {
 		panic(err)
 	}
+
+	//err =v.ReadRemoteConfig()
 	err = v.ReadConfig()
-	//err := v.ReadInConfig()
 
 	if err != nil {
 		panic(fmt.Errorf("Fatal error config file: %s \n", err))
@@ -80,19 +81,23 @@ func Test_viper(t *testing.T) {
 	fmt.Println(v.GetString("a.c.cb.ca"))
 	fmt.Println(v.GetStringMap("a.c.cb")["ca"])
 
+
 	for {
-		time.Sleep(3*time.Second)
-		fmt.Println(v.GetInt("asasa"))
 		fmt.Println(v.GetBool("debug"))
-		fmt.Println(v.GetStringMap("key4")["a"])
-		fmt.Println(v.GetIntSlice("key3"))
-		a := v.GetIntSlice("key3")
-		fmt.Println(reflect.TypeOf(a))
-		fmt.Println(len(a))
-
-
 	}
-	//fmt.Println(v.Getconfig())
+	//for {
+	//	time.Sleep(3*time.Second)
+	//	fmt.Println(v.GetInt("asasa"))
+	//	fmt.Println(v.GetBool("debug"))
+	//	fmt.Println(v.GetStringMap("key4")["a"])
+	//	fmt.Println(v.GetIntSlice("key3"))
+	//	a := v.GetIntSlice("key3")
+	//	fmt.Println(reflect.TypeOf(a))
+	//	fmt.Println(len(a))
+	//
+	//
+	//}
+	////fmt.Println(v.Getconfig())
 	time.Sleep(1*time.Hour)
 	v.Stop()
 
